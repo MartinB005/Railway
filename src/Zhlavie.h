@@ -15,6 +15,7 @@ struct Vyhybka
 {
     String tag;
     String kolaj;
+    int pin;
     int distanceIndex;
     int rotation;
     void *start;
@@ -59,11 +60,9 @@ public:
 
     void vyhybka(String tag, int distanceIndex, String kolaj, int rotation, bool direction, int pin)
     {
-       // if(pocetVyhybiek == 0) vyhybky = (Vyhybka*) malloc(sizeof(Vyhybka));
-       // else vyhybky = (Vyhybka*) realloc(vyhybky, (pocetVyhybiek + 1) * sizeof(Vyhybka));
-
-      //  Vyhybka vyhybka = {tag, kolaj, distanceIndex, rotation, NULL, NULL, NULL, direction, 0};
-        vyhybky[pocetVyhybiek] = {tag, kolaj, distanceIndex, rotation, NULL, NULL, NULL, direction, ODBOCKA};
+        pinMode(pin, INPUT_PULLUP);
+       
+        vyhybky[pocetVyhybiek] = {tag, kolaj, pin, distanceIndex, rotation, NULL, NULL, NULL, direction, !digitalRead(pin)};
 
 
         attachTerminals(&vyhybky[pocetVyhybiek]);
@@ -73,40 +72,41 @@ public:
         finalAssigment();
     }
 
-    Vyhybka find(String tag)
+    Vyhybka* find(String tag)
     {
         for (int i = 0; i < pocetVyhybiek; i++)
         {
             if (vyhybky[i].tag.equals(tag))
             {
-                return vyhybky[i];
+                return &vyhybky[i];
             }
         }
+        return NULL;
     }
 
     Kolaj* cielovaKolaj(String zKolaje, bool odchod) {
+        update();
         Kolaj from = stanica[getTrackIndex(zKolaje)];
         Vyhybka* vyhybka = odchod ? from.vyhybkaOdchod : from.vyhybkaVchod;
         void* prevAddress = &stanica[getTrackIndex(zKolaje)];
         
         while(true) {
-            Serial.print("vh ");
-            Serial.println(vyhybka->tag);
             if(vyhybka->start == prevAddress) {
                 prevAddress = vyhybka;
-                Serial.println(vyhybka->kolaj);
+                Serial.println(vyhybka->state == ROVNO);
                 if(vyhybka->state == ROVNO ? vyhybka->endings[1] : vyhybka->endings[2]) 
                     return (Kolaj*) (vyhybka->state == ROVNO ? vyhybka->straight : vyhybka->digress);
 
                 else vyhybka = vyhybka->state == ROVNO ? ((Vyhybka*) vyhybka->straight) : ((Vyhybka*) vyhybka->digress);
-                Serial.println(vyhybka->kolaj);
            
             } else if(vyhybka->straight == prevAddress) {
+                prevAddress = vyhybka;
                 if(vyhybka->state == ODBOCKA) return NULL;
                 else if(vyhybka->endings[0]) return (Kolaj*) vyhybka->start;
                 else vyhybka = (Vyhybka*) vyhybka->start;
             
             } else if(vyhybka->digress == prevAddress) {
+                prevAddress = vyhybka;
                 if(vyhybka->state == ROVNO) return NULL;
                 else if(vyhybka->endings[0]) return (Kolaj*) vyhybka->start;
                 else vyhybka = (Vyhybka*) vyhybka->start;
@@ -124,7 +124,7 @@ public:
             Serial.print("Vyhybka");
             Serial.println(vyhybka.tag);
             char buffer[100];
-            sprintf(buffer, "start: %p straight: %p digress: %p", vyhybka.start, vyhybka.straight, vyhybka.digress);
+            sprintf(buffer, "address: %p start: %p straight: %p digress: %p", &vyhybky[i], vyhybka.start, vyhybka.straight, vyhybka.digress);
             Serial.println(buffer);
         }
 
@@ -135,6 +135,36 @@ public:
             sprintf(buffer, "name: %s vchod: %p odchod: %p", kolaj.tag, kolaj.vyhybkaVchod, kolaj.vyhybkaOdchod);
             Serial.println(buffer);
         }
+    }
+
+    void update() {
+        for (int i = 0; i < pocetVyhybiek; i++)
+        {
+            vyhybky[i].state = !digitalRead(vyhybky[i].pin);
+        }
+    }
+
+    bool getState(String tag) {
+        Vyhybka* vyhybka = find(tag);
+        vyhybka->state = digitalRead(vyhybka->pin);
+        return vyhybka->state;
+    }
+
+    void printStationState() {
+        update();
+        for(int y = 3; y >= 0; y--) {
+            for(int x = 3; x >= 0; x--) {
+                for (int i = 0; i < pocetVyhybiek; i++)
+                {   
+                    if(vyhybky[i].distanceIndex == x && getTrackIndex(vyhybky[i].kolaj) == y) {
+                        Serial.print(vyhybky[i].state ? "_" : "\\");
+                    } else Serial.print(" ");
+
+                }
+            }
+            Serial.println();
+        }
+        
     }
 
 
@@ -162,14 +192,14 @@ private:
             {
                 Serial.println(vyhybka->rotation);
                 if (vyhybka->rotation == NORMAL)
-                    vyhybka->start = &current;
+                    vyhybka->start = current;
                 else
-                    vyhybka->straight = &current;
+                    vyhybka->straight = current;
 
                 if (current->rotation == NORMAL)
-                    current->straight = &vyhybka;
+                    current->straight = vyhybka;
                 else
-                    current->start = &vyhybka;
+                    current->start = vyhybka;
             }
 
             checkConnection(vyhybka, current);
@@ -197,20 +227,20 @@ private:
             if (aUp != bUp)
             {
                 if (vyhybkaA->rotation == SLOPED || vyhybkaA->rotation == SLOPED_REVERSE)
-                    vyhybkaA->straight = &vyhybkaB;
+                    vyhybkaA->straight = vyhybkaB;
                 else
-                    vyhybkaA->digress = &vyhybkaB;
+                    vyhybkaA->digress = vyhybkaB;
                 
-                vyhybkaB->digress = &vyhybkaA;
+                vyhybkaB->digress = vyhybkaA;
             }
 
             if (aUp == bUp)
             {
                 if (vyhybkaA->rotation == SLOPED || vyhybkaA->rotation == SLOPED_REVERSE)
-                    vyhybkaA->straight = &vyhybkaB;
+                    vyhybkaA->straight = vyhybkaB;
                 else
-                    vyhybkaB->digress = &vyhybkaB;
-                vyhybkaB->start = &vyhybkaA;
+                    vyhybkaB->digress = vyhybkaB;
+                vyhybkaB->start = vyhybkaA;
             }
         }
     }
