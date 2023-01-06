@@ -96,9 +96,10 @@ public:
 
     Kolaj* cielovaKolaj(String zKolaje, int rezim) {
         update();
-        Kolaj from = stanica[getTrackIndex(zKolaje)];
+        int trackIndex = getTrackIndex(zKolaje);
+        Kolaj from = stanica[trackIndex];
         Vyhybka* vyhybka = rezim == VCHOD ? from.vyhybkaVchod : from.vyhybkaOdchod;
-        void* prevAddress = &stanica[getTrackIndex(zKolaje)];
+        void* prevAddress = &stanica[trackIndex];
 
         Kolaj* kolaj = NULL;
         
@@ -194,7 +195,7 @@ public:
 
     bool getState(String tag) {
         Vyhybka* vyhybka = find(tag);
-        vyhybka->state = digitalRead(vyhybka->pin);
+        vyhybka->state = !digitalRead(vyhybka->pin);
         return vyhybka->state;
     }
 

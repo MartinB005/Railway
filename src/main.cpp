@@ -24,6 +24,9 @@ void setup() {
 
   zhlavie.kolaje(6, "K4", "K2", "K1", "K3", "K5", "K7");
 
+  zhlavie.odchodovaKolaj("K2");
+  zhlavie.odchodovaKolaj("K1");
+
 
   zhlavie.vyhybka("V1", 0, "K2", NORMAL, RIGHT, 34);
   zhlavie.vyhybka("V2", 1, "K2", NORMAL, LEFT, 35);
@@ -32,19 +35,18 @@ void setup() {
 
   zhlavie.build();
 
-  Serial.println("1234");
-  //zhlavie.printStation();
 
   L1_3.place(&zhlavie, 2, "K1", "K3");
-    Serial.println("3254");
   L2.place(&zhlavie, "K2");
   L4.place(&zhlavie, "K4");
+
+  Serial.println(zhlavie.cielovaKolaj("K2", ODCHOD)->tag);
 
 
 
 }
 
 void loop() {
-  panel.check(); 
+  panel.check();
   delay(100);
 }

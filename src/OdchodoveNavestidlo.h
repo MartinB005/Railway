@@ -74,7 +74,7 @@ class OdchodoveNavestidlo {
         }
 
         Kolaj* safeDeparture() {
-            for (size_t i = 1; i < pocetKolaji; i++)
+            for (size_t i = 0; i < pocetKolaji; i++)
             {
                 Serial.println(kolaje[i]);
                 Kolaj* kolaj = zhlavie->cielovaKolaj(kolaje[i], ODCHOD);

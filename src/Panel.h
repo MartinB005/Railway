@@ -18,19 +18,26 @@ class Panel {
     public:
         
         void connectSwitch(char* tag, int pin, OdchodoveNavestidlo* navestidlo) {
-            switchList = (Switch*) realloc(switchList, count * sizeof(Switch));
-            switchList[count] = {tag, pin, navestidlo, -1};
-            count++;
+            Switch newSwitch = {tag, pin, navestidlo, -1};
+            switchList[count] = newSwitch;
+            Serial.println(pin);
+            
             pinMode(pin, INPUT);
+
+            count++;
+            switchList = (Switch*) realloc(switchList, count * sizeof(Switch) * 2);
         }
 
         void check() {
             for(int i = 0; i < count; i++) {
-                Switch* currentSw = switchList + i;
+                Switch* currentSw = &switchList[i];
                 int value = analogRead(currentSw->pin);
-                int state = value > 1010 ? POSITION_UP : POSITION_DOWN;
+                int state = value >= 1010 ? POSITION_UP : POSITION_DOWN;
                 if(value < 800) state = POSITION_MIDDLE;
 
+               // Serial.println(String(i) + ": " + String(currentSw->pin));
+               
+                
                 if(state != currentSw->state) {
                     Serial.print("change detected: ");
                     Serial.println(currentSw->tag);
