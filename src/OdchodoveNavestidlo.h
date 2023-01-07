@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Navestidlo.h>
 #include <Zhlavie.h>
 
 #ifndef ODCHODOVE
@@ -10,52 +11,61 @@
 #define WHITE 0b01
 
 
-class OdchodoveNavestidlo {
+class OdchodoveNavestidlo : public Navestidlo {
     
     public:
 
-        OdchodoveNavestidlo(int pinA, int pinB) {
-            pinMode(pinA, OUTPUT);
-            pinMode(pinB, OUTPUT);
-           
-            this->pinA = pinA;
-            this->pinB = pinB;
+        OdchodoveNavestidlo(int pinA, int pinB, bool type) : Navestidlo(2, pinA, pinB) {
+            this->type = type;
+            directionMode = ODCHOD;
+            RED_VAL = 0b00;
         }
 
         void volno() {
+            Serial.println("volno");
             Kolaj* kolaj = safeDeparture();
             if(kolaj != NULL) {
-                changeState(zhlavie->limitedSpeed(kolaj->tag, ODCHOD) ? GREEN_40 : GREEN);
+                int newState = GREEN_40;
+                if(type == TYPE_FOUR_LED) newState = zhlavie->limitedSpeed(currentTrack, ODCHOD) ? GREEN_40 : GREEN;
+                changeState(newState);
+                zhlavie->reserveWay(currentTrack, ODCHOD, this);
+            }
+        }
+
+        void posun() {
+            if(safeShunt()) {
+                changeState(WHITE);
+                zhlavie->reserveWay(currentTrack, POSUN, this);
             }
         }
 
         void stoj() {
-            changeState(RED);
+            Navestidlo::stoj();
+            zhlavie->releaseWay(currentTrack, directionMode);
         }
 
-        void posun() {
-            if(safeShunt()) changeState(WHITE);
-        }
-
-        void place(Zhlavie* zhlavie, String kolaj) {
+        void place(Zhlavie* zhlavie, char* kolaj) {
             this->zhlavie = zhlavie;
+            kolaje = (char**) malloc(sizeof(char*));
             this->kolaje[0] = kolaj;
             pocetKolaji = 1;
         }
 
-        void place(Zhlavie* zhlavie, size_t pocetKolaji, String kolaj, ...) {
+        void place(Zhlavie* zhlavie, size_t pocetKolaji, char* kolaj, ...) {
             this->zhlavie = zhlavie;
 
             va_list l_Arg;
             va_start(l_Arg, kolaj);
             this->pocetKolaji = pocetKolaji;
 
-            for (size_t i = 1; i < pocetKolaji; i++)
+            kolaje = (char**) malloc(pocetKolaji * sizeof(char*));
+
+
+            for (size_t i = 0; i < pocetKolaji; i++)
             {
                 kolaje[i] = kolaj;
                 kolaj = va_arg(l_Arg, char*);
-                Serial.println(kolaj.length());
-                Serial.println(kolaj != NULL);
+                //Serial.println(kolaj.length());
             }
 
             va_end(l_Arg);
@@ -63,30 +73,27 @@ class OdchodoveNavestidlo {
 
     private:
 
-        int pinA, pinB;
-        Zhlavie* zhlavie;
-        String kolaje[5];
+        bool type;
+        char** kolaje;
         size_t pocetKolaji;
-
-        void changeState(byte state) {
-            digitalWrite(pinA, (state >> 1) & 1 ? HIGH : LOW);
-            digitalWrite(pinB, (state >> 0) & 1 ? HIGH : LOW);
-        }
+        Zhlavie* zhlavie;
+        char* currentTrack;
 
         Kolaj* safeDeparture() {
             for (size_t i = 0; i < pocetKolaji; i++)
             {
-                Serial.println(kolaje[i]);
                 Kolaj* kolaj = zhlavie->cielovaKolaj(kolaje[i], ODCHOD);
-                Serial.println(kolaj->tag);
-                if(kolaj != NULL) return kolaj;
+                if(kolaj != NULL) {
+                    currentTrack = kolaje[i];
+                    return kolaj;
+                } 
             }
 
             return NULL;
         }
 
         bool safeShunt() {
-            for (size_t i = 1; i < pocetKolaji; i++)
+            for (size_t i = 0; i < pocetKolaji; i++)
             {
                 if(zhlavie->cielovaKolaj(kolaje[i], POSUN) != NULL) return true;
             }

@@ -8,7 +8,7 @@
 struct Switch {
     char* tag;
     int pin;
-    OdchodoveNavestidlo* navestidlo;
+    Navestidlo* navestidlo;
     short state;
 };
 
@@ -17,7 +17,7 @@ class Panel {
     
     public:
         
-        void connectSwitch(char* tag, int pin, OdchodoveNavestidlo* navestidlo) {
+        void connectSwitch(char* tag, int pin, Navestidlo* navestidlo) {
             Switch newSwitch = {tag, pin, navestidlo, -1};
             switchList[count] = newSwitch;
             Serial.println(pin);

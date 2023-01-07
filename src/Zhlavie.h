@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Navestidlo.h>
 
 #ifndef ZHLAVIE
 #define ZHLAVIE
@@ -18,6 +19,10 @@
 #define VCHOD 0
 #define POSUN 2
 
+#define TYPE_FOUR_LED 0
+#define TYPE_THREE_LED 1
+
+
 struct Vyhybka
 {
     String tag;
@@ -31,6 +36,7 @@ struct Vyhybka
     bool direction;
     bool state;
     bool endings[3];
+    Navestidlo* signalReservation;
 };
 
 struct Kolaj
@@ -45,6 +51,7 @@ class Zhlavie
 {
 
 public:
+
     void kolaje(size_t pocet, char *kolaj, ...)
     {
         va_list l_Arg;
@@ -74,7 +81,7 @@ public:
     {
         pinMode(pin, INPUT_PULLUP);
        
-        vyhybky[pocetVyhybiek] = {tag, kolaj, pin, distanceIndex, rotation, NULL, NULL, NULL, direction, !digitalRead(pin)};
+        vyhybky[pocetVyhybiek] = {tag, kolaj, pin, distanceIndex, rotation, NULL, NULL, NULL, direction, !digitalRead(pin), NULL};
 
 
         attachTerminals(&vyhybky[pocetVyhybiek]);
@@ -94,16 +101,18 @@ public:
         return NULL;
     }
 
-    Kolaj* cielovaKolaj(String zKolaje, int rezim) {
-        update();
-        int trackIndex = getTrackIndex(zKolaje);
+    template<typename Callable>
+    Kolaj* cross(String track, int mode, Callable iterateFunc) {
+        int trackIndex = getTrackIndex(track);
         Kolaj from = stanica[trackIndex];
-        Vyhybka* vyhybka = rezim == VCHOD ? from.vyhybkaVchod : from.vyhybkaOdchod;
+
+        Vyhybka* vyhybka = mode == VCHOD ? from.vyhybkaVchod : from.vyhybkaOdchod;
         void* prevAddress = &stanica[trackIndex];
 
         Kolaj* kolaj = NULL;
         
         while(true) {
+            iterateFunc(vyhybka);
             if(vyhybka->start == prevAddress) {
                 prevAddress = vyhybka;
                 if(vyhybka->state == ROVNO ? vyhybka->endings[1] : vyhybka->endings[2]) 
@@ -125,94 +134,41 @@ public:
             
             } else return NULL;
 
-            if(kolaj != NULL && (rezim == VCHOD || (rezim == ODCHOD && kolaj->odchodova) || rezim == POSUN))
+            if(kolaj != NULL && (mode == VCHOD || (mode == ODCHOD && kolaj->odchodova) || mode == POSUN))
                 return kolaj;
         }
 
         return NULL;
     }
 
-    bool limitedSpeed(String zKolaje, bool odchod) {
+    Kolaj* cielovaKolaj(String zKolaje, int rezim) {
         update();
-        Kolaj from = stanica[getTrackIndex(zKolaje)];
-        Vyhybka* vyhybka = odchod ? from.vyhybkaOdchod : from.vyhybkaVchod;
-        void* prevAddress = &stanica[getTrackIndex(zKolaje)];
+        Serial.println("beforr");
+        return cross(zKolaje, rezim, [&](Vyhybka* vyhybka){});
+    }
+    
 
-        bool limited;
-        
-        while(true) {
+    bool limitedSpeed(String track, bool mode) {
+        update();
+        bool limited = false;
+
+        Kolaj* result = cross(track, mode, [&] (Vyhybka* vyhybka) {
             if(vyhybka->state == ODBOCKA) limited = true;
-            if(vyhybka->start == prevAddress) {
-                prevAddress = vyhybka;
-                if(vyhybka->state == ROVNO ? vyhybka->endings[1] : vyhybka->endings[2]) 
-                    return limited;
+        });
 
-                else vyhybka = vyhybka->state == ROVNO ? ((Vyhybka*) vyhybka->straight) : ((Vyhybka*) vyhybka->digress);
-           
-            } else if(vyhybka->straight == prevAddress) {
-                prevAddress = vyhybka;
-                if(vyhybka->endings[0]) return limited;
-                else vyhybka = (Vyhybka*) vyhybka->start;
-            
-            } else if(vyhybka->digress == prevAddress) {
-                prevAddress = vyhybka;
-                if(vyhybka->endings[0]) return limited;
-                else vyhybka = (Vyhybka*) vyhybka->start;
-            
-            } else return false;
-        }
-
-        return false;
+        return result != NULL && limited;
     }
 
-    void printStation() {
-        for (int i = 0; i < pocetVyhybiek; i++)
-        {
-            Vyhybka vyhybka = vyhybky[i];
-            Serial.print("Vyhybka ");
-            Serial.println(vyhybka.tag);
-            char buffer[100];
-            sprintf(buffer, "address: %p start: %p straight: %p digress: %p end: %d %d %d", 
-                &vyhybky[i], vyhybka.start, vyhybka.straight, vyhybka.digress, vyhybka.endings[0], vyhybka.endings[1], vyhybka.endings[2]);
-            Serial.println(buffer);
-        }
-
-        for (int i = 0; i < pocetKolaji; i++)
-        {
-            Kolaj kolaj = stanica[i];
-            char buffer[100];
-            sprintf(buffer, "name: %s vchod: %p odchod: %p", kolaj.tag, kolaj.vyhybkaVchod, kolaj.vyhybkaOdchod);
-            Serial.println(buffer);
-        }
+    void reserveWay(String track, int mode, Navestidlo* signal) {
+        cross(track, mode, [&] (Vyhybka* vyhybka) {
+            vyhybka->signalReservation = signal;
+        });
     }
-
-    void update() {
-        for (int i = 0; i < pocetVyhybiek; i++)
-        {
-            vyhybky[i].state = !digitalRead(vyhybky[i].pin);
-        }
-    }
-
-    bool getState(String tag) {
-        Vyhybka* vyhybka = find(tag);
-        vyhybka->state = !digitalRead(vyhybka->pin);
-        return vyhybka->state;
-    }
-
-    void printStationState() {
-        update();
-        for(int y = 3; y >= 0; y--) {
-            for(int x = 3; x >= 0; x--) {
-                for (int i = 0; i < pocetVyhybiek; i++)
-                {   
-                    if(vyhybky[i].distanceIndex == x && getTrackIndex(vyhybky[i].kolaj) == y) {
-                        Serial.print(vyhybky[i].state ? "_" : "\\");
-                    } else Serial.print(" ");
-
-                }
-            }
-            Serial.println();
-        }
+    
+    void releaseWay(String track, int mode) {
+        cross(track, mode, [&] (Vyhybka* vyhybka) {
+            vyhybka->signalReservation = NULL;
+        });
     }
 
     void build()
@@ -261,6 +217,72 @@ public:
 
                 vyhybka->endings[2] = true;
             }
+        }
+    }
+
+    void update() {
+        for (int i = 0; i < pocetVyhybiek; i++)
+        {
+            vyhybky[i].state = !digitalRead(vyhybky[i].pin);
+        }
+    }
+
+    void checkSwitches() {
+        for (int i = 0; i < pocetVyhybiek; i++)
+        {
+            int state = !digitalRead(vyhybky[i].pin);
+            if(state != vyhybky[i].state) {
+                Serial.println("State changed: " + String(vyhybky[i].tag));
+                Navestidlo* signal = vyhybky[i].signalReservation;
+                if(signal != NULL) {
+                    signal->stoj();
+                    releaseWay(signal->currentTrack, signal->directionMode);
+                }
+                vyhybky[i].state = state;
+            }
+        }
+    }
+
+    bool getState(String tag) {
+        Vyhybka* vyhybka = find(tag);
+        vyhybka->state = !digitalRead(vyhybka->pin);
+        return vyhybka->state;
+    }
+
+    void printStationState() {
+        update();
+        for(int y = 3; y >= 0; y--) {
+            for(int x = 3; x >= 0; x--) {
+                for (int i = 0; i < pocetVyhybiek; i++)
+                {   
+                    if(vyhybky[i].distanceIndex == x && getTrackIndex(vyhybky[i].kolaj) == y) {
+                        Serial.print(vyhybky[i].state ? "_" : "\\");
+                    } else Serial.print(" ");
+
+                }
+            }
+            Serial.println();
+        }
+    }
+
+    void printStation() {
+        for (int i = 0; i < pocetVyhybiek; i++)
+        {
+            Vyhybka vyhybka = vyhybky[i];
+            Serial.print("Vyhybka ");
+            Serial.println(vyhybka.tag);
+            char buffer[100];
+            sprintf(buffer, "address: %p start: %p straight: %p digress: %p end: %d %d %d", 
+                &vyhybky[i], vyhybka.start, vyhybka.straight, vyhybka.digress, vyhybka.endings[0], vyhybka.endings[1], vyhybka.endings[2]);
+            Serial.println(buffer);
+        }
+
+        for (int i = 0; i < pocetKolaji; i++)
+        {
+            Kolaj kolaj = stanica[i];
+            char buffer[100];
+            sprintf(buffer, "name: %s vchod: %p odchod: %p", kolaj.tag, kolaj.vyhybkaVchod, kolaj.vyhybkaOdchod);
+            Serial.println(buffer);
         }
     }
 

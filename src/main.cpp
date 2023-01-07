@@ -1,26 +1,30 @@
 #include <Arduino.h>
-#include <OdchodoveNavestidlo.h>
-#include <Panel.h>
 #include <Zhlavie.h>
+#include <OdchodoveNavestidlo.h>
+#include <VchodoveNavestidlo.h>
+#include <Panel.h>
 
-OdchodoveNavestidlo L1_3(28, 29);
-OdchodoveNavestidlo L2(36, 37);
-OdchodoveNavestidlo L4(38, 39);
+OdchodoveNavestidlo L1_3(28, 29, TYPE_FOUR_LED);
+OdchodoveNavestidlo L2(36, 37, TYPE_THREE_LED);
+OdchodoveNavestidlo L4(38, 39, TYPE_FOUR_LED);
 
-Zhlavie zhlavie;
+VchodoveNavestidlo S(24, 25, 26);
+
+
 
 Panel panel;
 
-void setup() {
- Serial.begin(9600);
+Zhlavie zhlavie;
 
-     Serial.println("----");
+void setup() {
+  Serial.begin(9600);
 
   panel.connectSwitch("L4", A1, &L4);
   panel.connectSwitch("L1_3", A4, &L1_3);
   panel.connectSwitch("L2", A7, &L2);
 
-  Serial.println("----");
+  panel.connectSwitch("S", A3, &S);
+
 
   zhlavie.kolaje(6, "K4", "K2", "K1", "K3", "K5", "K7");
 
@@ -35,18 +39,22 @@ void setup() {
 
   zhlavie.build();
 
+  Serial.print(" test: ");
+  Serial.println(zhlavie.cielovaKolaj("K2", ODCHOD)->tag);
+
 
   L1_3.place(&zhlavie, 2, "K1", "K3");
   L2.place(&zhlavie, "K2");
   L4.place(&zhlavie, "K4");
 
-  Serial.println(zhlavie.cielovaKolaj("K2", ODCHOD)->tag);
-
-
+  S.place(&zhlavie, "K1");
 
 }
 
 void loop() {
   panel.check();
+  zhlavie.checkSwitches();
   delay(100);
+
 }
+
