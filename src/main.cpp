@@ -3,14 +3,14 @@
 #include <OdchodoveNavestidlo.h>
 #include <VchodoveNavestidlo.h>
 #include <Panel.h>
+#include <IntervalTask.h>
 
 OdchodoveNavestidlo L1_3(28, 29, TYPE_FOUR_LED);
 OdchodoveNavestidlo L2(36, 37, TYPE_THREE_LED);
 OdchodoveNavestidlo L4(38, 39, TYPE_FOUR_LED);
 
 VchodoveNavestidlo S(24, 25, 26);
-
-
+Predzvest prS(22, 23);
 
 Panel panel;
 
@@ -48,6 +48,10 @@ void setup() {
   L4.place(&zhlavie, "K4");
 
   S.place(&zhlavie, "K1");
+
+  S.predzvest(&prS);
+
+  IntervalTask::init();
 
 }
 

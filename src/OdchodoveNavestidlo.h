@@ -22,13 +22,13 @@ class OdchodoveNavestidlo : public Navestidlo {
         }
 
         void volno() {
-            Serial.println("volno");
             Kolaj* kolaj = safeDeparture();
             if(kolaj != NULL) {
                 int newState = GREEN_40;
                 if(type == TYPE_FOUR_LED) newState = zhlavie->limitedSpeed(currentTrack, ODCHOD) ? GREEN_40 : GREEN;
                 changeState(newState);
                 zhlavie->reserveWay(currentTrack, ODCHOD, this);
+                go = true;
             }
         }
 
@@ -36,12 +36,16 @@ class OdchodoveNavestidlo : public Navestidlo {
             if(safeShunt()) {
                 changeState(WHITE);
                 zhlavie->reserveWay(currentTrack, POSUN, this);
+                go = true;
             }
         }
 
         void stoj() {
-            Navestidlo::stoj();
-            zhlavie->releaseWay(currentTrack, directionMode);
+            if(go) {
+                Navestidlo::stoj();
+                zhlavie->releaseWay(currentTrack, directionMode);
+                go = false;
+            }
         }
 
         void place(Zhlavie* zhlavie, char* kolaj) {
@@ -77,7 +81,7 @@ class OdchodoveNavestidlo : public Navestidlo {
         char** kolaje;
         size_t pocetKolaji;
         Zhlavie* zhlavie;
-        char* currentTrack;
+        bool go;
 
         Kolaj* safeDeparture() {
             for (size_t i = 0; i < pocetKolaji; i++)

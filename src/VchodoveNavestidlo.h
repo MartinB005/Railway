@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Navestidlo.h>
 #include <Zhlavie.h>
+#include <Predzvest.h>
 
 #define GREEN 0b101
 #define GREEN_40 0b100
@@ -29,23 +30,40 @@ class VchodoveNavestidlo : public Navestidlo {
             Kolaj* result = zhlavie->cielovaKolaj(kolaj, VCHOD);
 
             if(result != NULL) {
-                changeState(zhlavie->limitedSpeed(kolaj, VCHOD) ? GREEN_40 : GREEN);
+                bool limitedSpeed = zhlavie->limitedSpeed(kolaj, VCHOD);
+                changeState(limitedSpeed ? GREEN_40 : GREEN);
+                
+                if(limitedSpeed) presage->volno40();
+                else presage->signalVolno();
+
                 zhlavie->reserveWay(kolaj, VCHOD, this);
+                go = true;
             }
         }
 
         void posun() {
+            go = true;
             stoj();
         };
 
         void stoj() {
-            Navestidlo::stoj();
-            zhlavie->releaseWay(kolaj, VCHOD);
+            if(go) {
+                Navestidlo::stoj();
+                presage->vystraha();
+                zhlavie->releaseWay(kolaj, VCHOD);
+                go = false;
+            }
+        }
+
+        void predzvest(Predzvest* predzvest) {
+            this->presage = predzvest;
         }
 
     private:
 
+        Predzvest* presage;
         Zhlavie* zhlavie;
         char* kolaj;
+        bool go;
     
 };

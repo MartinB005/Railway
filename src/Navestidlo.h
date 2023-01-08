@@ -31,7 +31,7 @@ class Navestidlo {
             va_end(l_Arg);
         }
 
-        void stoj() {
+        virtual void stoj() {
             changeState(RED_VAL);
         }
 

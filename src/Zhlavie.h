@@ -102,7 +102,7 @@ public:
     }
 
     template<typename Callable>
-    Kolaj* cross(String track, int mode, Callable iterateFunc) {
+        Kolaj* cross(String track, int mode, Callable iterateFunc) {
         int trackIndex = getTrackIndex(track);
         Kolaj from = stanica[trackIndex];
 
@@ -113,6 +113,7 @@ public:
         
         while(true) {
             iterateFunc(vyhybka);
+            if(vyhybka->signalReservation != NULL) return NULL;
             if(vyhybka->start == prevAddress) {
                 prevAddress = vyhybka;
                 if(vyhybka->state == ROVNO ? vyhybka->endings[1] : vyhybka->endings[2]) 
@@ -143,7 +144,6 @@ public:
 
     Kolaj* cielovaKolaj(String zKolaje, int rezim) {
         update();
-        Serial.println("beforr");
         return cross(zKolaje, rezim, [&](Vyhybka* vyhybka){});
     }
     
